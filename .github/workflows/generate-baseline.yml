@@ -50,10 +50,11 @@ jobs:
 
       - name: Generate baseline JSON
         run: |
-          mkdir -p baseline
+          mkdir -p baseline/historical
+          ncsb-generate --out baseline/nist80053r5_full_catalog_enriched.json
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
-          ncsb-generate \
-            --out "baseline/nist80053r5_full_catalog_enriched_${TIMESTAMP}.json"
+          cp baseline/nist80053r5_full_catalog_enriched.json \
+            "baseline/historical/nist80053r5_full_catalog_enriched_${TIMESTAMP}.json"
 
       - name: Commit and push baseline
         run: |

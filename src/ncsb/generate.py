@@ -11,8 +11,9 @@ import json
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from io import StringIO
-from typing import Dict, Any, Set, Optional
+from typing import Any
 
 import pandas as pd
 import requests
@@ -54,7 +55,7 @@ def is_base(control_id: str) -> bool:
     return bool(CONTROL_ID_RE.match(control_id))
 
 
-def parent_of(enh_id: str) -> Optional[str]:
+def parent_of(enh_id: str) -> str | None:
     m = ENHANCEMENT_RE.match(enh_id)
     return m.group(1) if m else None
 
@@ -64,7 +65,7 @@ def family_of(control_id: str) -> str:
     return base.split("-")[0]
 
 
-def baseline_id_set(df: pd.DataFrame) -> Set[str]:
+def baseline_id_set(df: pd.DataFrame) -> set[str]:
     df.columns = [c.strip() for c in df.columns]
     candidates = [
         "Control Identifier",
@@ -78,10 +79,10 @@ def baseline_id_set(df: pd.DataFrame) -> Set[str]:
     return {normalize_id(v) for v in df[col].dropna().tolist() if normalize_id(v)}
 
 
-def controls_catalog(df: pd.DataFrame) -> Dict[str, Dict[str, Any]]:
+def controls_catalog(df: pd.DataFrame) -> dict[str, dict[str, Any]]:
     df.columns = [c.strip() for c in df.columns]
 
-    def pick(*names: str) -> Optional[str]:
+    def pick(*names: str) -> str | None:
         for n in names:
             if n in df.columns:
                 return n
@@ -96,7 +97,7 @@ def controls_catalog(df: pd.DataFrame) -> Dict[str, Dict[str, Any]]:
     if id_col is None:
         raise ValueError("Could not find a control identifier column in controls CSV.")
 
-    out: Dict[str, Dict[str, Any]] = {}
+    out: dict[str, dict[str, Any]] = {}
 
     for _, row in df.iterrows():
         cid = normalize_id(row.get(id_col))
@@ -131,7 +132,7 @@ class Rules:
     severity_none: str = "LOW"
 
 
-def membership_flags(cid: str, low: Set[str], moderate: Set[str], high: Set[str], privacy: Set[str]) -> Dict[str, bool]:
+def membership_flags(cid: str, low: set[str], moderate: set[str], high: set[str], privacy: set[str]) -> dict[str, bool]:
     return {
         "low": cid in low,
         "moderate": cid in moderate,
@@ -140,7 +141,7 @@ def membership_flags(cid: str, low: Set[str], moderate: Set[str], high: Set[str]
     }
 
 
-def severity_from_membership(m: Dict[str, bool], rules: Rules) -> str:
+def severity_from_membership(m: dict[str, bool], rules: Rules) -> str:
     if m["low"]:
         return rules.severity_low
     if m["moderate"]:
@@ -152,7 +153,7 @@ def severity_from_membership(m: Dict[str, bool], rules: Rules) -> str:
     return rules.severity_none
 
 
-def non_negotiable_from_membership(m: Dict[str, bool], rules: Rules) -> bool:
+def non_negotiable_from_membership(m: dict[str, bool], rules: Rules) -> bool:
     if rules.non_negotiable_min_baseline.lower() == "high":
         return bool(m["high"])
     return bool(m["moderate"] or m["high"])
@@ -175,12 +176,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def log_orphan_baselines(
-    catalog_ids: Set[str],
+    catalog_ids: set[str],
     *,
-    low: Set[str],
-    moderate: Set[str],
-    high: Set[str],
-    privacy: Set[str],
+    low: set[str],
+    moderate: set[str],
+    high: set[str],
+    privacy: set[str],
 ) -> None:
     """Warn about baseline control IDs that don't appear in the catalog."""
     baselines = {"low": low, "moderate": moderate, "high": high, "privacy": privacy}
@@ -232,7 +233,7 @@ def main() -> None:
     out_obj = {
         "project": "NIST Cloud Security Baseline (NCSB)",
         "project_version": __version__,
-        "generated_at_utc": __import__("datetime").datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "framework": "NIST SP 800-53 Rev. 5",
         "reference": {
             "publication": "https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final",

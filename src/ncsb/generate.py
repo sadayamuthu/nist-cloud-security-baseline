@@ -20,11 +20,11 @@ import requests
 
 from . import __version__
 from .urls import (
-    CONTROLS_CSV_URL,
+    BASELINE_HIGH_CSV_URL,
     BASELINE_LOW_CSV_URL,
     BASELINE_MODERATE_CSV_URL,
-    BASELINE_HIGH_CSV_URL,
     BASELINE_PRIVACY_CSV_URL,
+    CONTROLS_CSV_URL,
 )
 
 logger = logging.getLogger(__name__)

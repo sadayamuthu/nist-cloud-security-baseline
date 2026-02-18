@@ -60,4 +60,4 @@ src = ["src", "tests"]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["ncsb"]
+known-first-party = ["ncsb", "src"]

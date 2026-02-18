@@ -7,7 +7,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
-import pytest
 
 from src.ncsb.generate import log_orphan_baselines, main
 
@@ -147,7 +146,6 @@ def test_non_negotiable_high_only(mock_dl):
         with open(out_path, encoding="utf-8") as f:
             data = json.load(f)
 
-    by_id = {c["control_id"]: c for c in data["controls"]}
     for ctrl in data["controls"]:
         if ctrl["baseline_membership"]["high"]:
             assert ctrl["non_negotiable"] is True

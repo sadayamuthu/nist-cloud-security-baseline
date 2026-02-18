@@ -54,6 +54,15 @@ Default rules:
 - Non-negotiable is `true` if control is in **Moderate or High**.
   (You can switch this to `--non_negotiable_min_baseline high`.)
 
+## Automation (GitHub Actions)
+
+A GitHub Actions workflow (`.github/workflows/generate-baseline.yml`) runs the
+generator daily and on every push to `main`. Each run writes a timestamped JSON
+file to the `baseline/` directory, e.g.
+`baseline/nist80053r5_full_catalog_enriched_2026-02-18T06-00-00Z.json`,
+and commits it back to the repo. You can also trigger it manually via
+**Actions > Generate NIST Cloud Security Baseline > Run workflow**.
+
 ## Source of truth
 
 NIST downloads page:

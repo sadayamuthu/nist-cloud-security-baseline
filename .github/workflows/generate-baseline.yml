@@ -1,0 +1,50 @@
+name: Generate NIST Cloud Security Baseline
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # daily at 06:00 UTC
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m pytest tests/ -v
+
+      - name: Generate baseline JSON
+        run: |
+          mkdir -p baseline
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+          python -m src.ncsb.generate \
+            --out "baseline/nist80053r5_full_catalog_enriched_${TIMESTAMP}.json"
+
+      - name: Commit and push baseline
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add baseline/
+          if ! git diff --cached --quiet; then
+            git commit -m "baseline: update enriched catalog $(date -u +%Y-%m-%d)"
+            git push
+          else
+            echo "No changes to commit."
+          fi

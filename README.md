@@ -36,10 +36,10 @@ pip install -e ".[dev]"
 ncsb-generate --out examples/nist80053r5_full_catalog_enriched.json
 ```
 
-Or run directly without installing:
+Or run directly without installing as a package:
 
 ```bash
-pip install -r requirements.txt
+pip install pandas requests
 python -m src.ncsb.generate --out examples/nist80053r5_full_catalog_enriched.json
 ```
 
@@ -119,7 +119,6 @@ nist-cloud-security-baseline/
 ├── .github/workflows/
 │   └── generate-baseline.yml
 ├── pyproject.toml
-├── requirements.txt         # minimal fallback for pip install
 └── LICENSE
 ```
 

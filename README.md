@@ -134,8 +134,9 @@ Each run:
 
 1. Runs the test suite across Python 3.11, 3.12, and 3.13.
 2. Lints with [Ruff](https://docs.astral.sh/ruff/).
-3. Generates a timestamped JSON file under `baseline/`, e.g. `baseline/nist80053r5_full_catalog_enriched_2026-02-18T06-00-00Z.json`.
-4. Commits and pushes the file back to the repo.
+3. Generates `baseline/nist80053r5_full_catalog_enriched.json` (latest, always the same path) and archives a timestamped copy under `baseline/historical/`.
+4. Commits and pushes the files back to the repo.
+5. Creates a **GitHub Release** (tagged `baseline-YYYY-MM-DD`) with the JSON attached as a downloadable asset and detailed release notes including control count, framework version, and generation timestamp.
 
 ## Development
 

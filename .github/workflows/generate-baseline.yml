@@ -57,6 +57,7 @@ jobs:
             "baseline/historical/nist80053r5_full_catalog_enriched_${TIMESTAMP}.json"
 
       - name: Commit and push baseline
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -64,6 +65,72 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "baseline: update enriched catalog $(date -u +%Y-%m-%d)"
             git push
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
           else
             echo "No changes to commit."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Create GitHub Release
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="baseline-$(date -u +%Y-%m-%d)"
+          COUNT=$(jq '.count' baseline/nist80053r5_full_catalog_enriched.json)
+          VERSION=$(jq -r '.project_version' baseline/nist80053r5_full_catalog_enriched.json)
+          GENERATED=$(jq -r '.generated_at_utc' baseline/nist80053r5_full_catalog_enriched.json)
+
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          git tag -d "$TAG" 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+
+          git tag "$TAG"
+          git push origin "$TAG"
+
+          gh release create "$TAG" \
+            baseline/nist80053r5_full_catalog_enriched.json \
+            --title "NIST Cloud Security Baseline — ${TAG}" \
+            --notes "$(cat <<EOF
+          ## NIST Cloud Security Baseline (NCSB)
+
+          **Framework:** NIST SP 800-53 Rev. 5
+          **NCSB Version:** ${VERSION}
+          **Generated at:** ${GENERATED}
+          **Total controls:** ${COUNT}
+
+          ### What is this?
+
+          A machine-readable, cloud-agnostic security baseline derived from the full
+          NIST SP 800-53 Rev. 5 control catalog and the SP 800-53B baseline profiles
+          (Low, Moderate, High, Privacy). Every control is enriched with:
+
+          - **Baseline membership** flags (Low / Moderate / High / Privacy)
+          - **Severity** (LOW / MEDIUM / HIGH / CRITICAL) based on baseline tier
+          - **Non-negotiable** indicator for Moderate+ controls
+
+          ### Attached asset
+
+          - \`nist80053r5_full_catalog_enriched.json\` — the complete enriched catalog
+
+          ### Data source
+
+          [NIST SP 800-53 Rev. 5 Downloads](https://csrc.nist.gov/projects/risk-management/sp800-53-controls/downloads)
+
+          > This release was generated automatically by GitHub Actions from live NIST data.
+          EOF
+          )"
+
+      - name: Update repository metadata
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh repo edit \
+            --description "Machine-readable NIST SP 800-53 Rev. 5 cloud security baseline with enriched severity, baseline membership, and non-negotiable flags. Auto-updated daily." \
+            --add-topic nist \
+            --add-topic nist-800-53 \
+            --add-topic cloud-security \
+            --add-topic compliance \
+            --add-topic security-baseline \
+            --add-topic fedramp

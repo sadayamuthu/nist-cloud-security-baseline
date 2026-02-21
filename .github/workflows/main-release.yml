@@ -1,4 +1,4 @@
-name: Generate NIST Cloud Security Baseline
+name: Main Release Pipeline
 
 on:
   schedule:
@@ -25,15 +25,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install package with dev dependencies
-        run: pip install -e ".[dev]"
+        run: make install-dev
 
-      - name: Lint with ruff
-        run: ruff check src/ tests/
+      - name: Run code validation checks
+        run: make check
 
-      - name: Run tests
-        run: pytest -v
-
-  generate:
+  generate-and-release:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -46,15 +43,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install package
-        run: pip install .
+        run: make install
 
       - name: Generate baseline JSON
-        run: |
-          mkdir -p baseline/historical
-          ncsb-generate --out baseline/nist80053r5_full_catalog_enriched.json
-          TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
-          cp baseline/nist80053r5_full_catalog_enriched.json \
-            "baseline/historical/nist80053r5_full_catalog_enriched_${TIMESTAMP}.json"
+        run: make generate
 
       - name: Commit and push baseline
         id: commit

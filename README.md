@@ -56,6 +56,38 @@ python -m src.ncsb.generate --out examples/nist80053r5_full_catalog_enriched.jso
 | `--baseline_privacy_csv_url` | NIST Privacy baseline URL | Override the Privacy baseline CSV |
 | `--version` | | Print version and exit |
 
+## Code Flow Design
+
+```mermaid
+graph TD
+    A[NIST OSCAL JSON Catalogs] -->|HTTPS GET| B(ncsb.generate)
+    
+    subparse1(NIST SP 800-53 Rev. 5 Catalog) --> parse_catalog[Parse Catalog Data]
+    subparse2(Low Baseline) --> parse_profile[Parse Profile IDs]
+    subparse3(Moderate Baseline) --> parse_profile
+    subparse4(High Baseline) --> parse_profile
+    subparse5(Privacy Baseline) --> parse_profile
+
+    B -.-> subparse1
+    B -.-> subparse2
+    B -.-> subparse3
+    B -.-> subparse4
+    B -.-> subparse5
+
+    parse_catalog --> Enrich(Enrich Controls)
+    parse_profile --> Enrich
+
+    Enrich --> |assign baseline flags| C1(Baseline Membership)
+    Enrich --> |derive severity| C2(Severity Level)
+    Enrich --> |evaluate conditions| C3(Non-negotiable Flag)
+
+    C1 --> Out(nist80053r5_full_catalog_enriched.json)
+    C2 --> Out
+    C3 --> Out
+    
+    Out --> D{Downstream Systems}
+```
+
 ## Output schema
 
 The generated JSON has this top-level structure:

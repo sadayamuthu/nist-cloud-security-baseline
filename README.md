@@ -56,6 +56,38 @@ python -m src.ncsb.generate --out examples/nist80053r5_full_catalog_enriched.jso
 | `--baseline_privacy_csv_url` | NIST Privacy baseline URL | Override the Privacy baseline CSV |
 | `--version` | | Print version and exit |
 
+## Code Flow Design
+
+```mermaid
+graph TD
+    A[NIST OSCAL JSON Catalogs] -->|HTTPS GET| B(ncsb.generate)
+    
+    subparse1(NIST SP 800-53 Rev. 5 Catalog) --> parse_catalog[Parse Catalog Data]
+    subparse2(Low Baseline) --> parse_profile[Parse Profile IDs]
+    subparse3(Moderate Baseline) --> parse_profile
+    subparse4(High Baseline) --> parse_profile
+    subparse5(Privacy Baseline) --> parse_profile
+
+    B -.-> subparse1
+    B -.-> subparse2
+    B -.-> subparse3
+    B -.-> subparse4
+    B -.-> subparse5
+
+    parse_catalog --> Enrich(Enrich Controls)
+    parse_profile --> Enrich
+
+    Enrich --> |assign baseline flags| C1(Baseline Membership)
+    Enrich --> |derive severity| C2(Severity Level)
+    Enrich --> |evaluate conditions| C3(Non-negotiable Flag)
+
+    C1 --> Out(nist80053r5_full_catalog_enriched.json)
+    C2 --> Out
+    C3 --> Out
+    
+    Out --> D{Downstream Systems}
+```
+
 ## Output schema
 
 The generated JSON has this top-level structure:
@@ -113,12 +145,16 @@ nist-cloud-security-baseline/
 │   └── urls.py              # default NIST download URLs
 ├── tests/
 │   ├── test_generate.py     # integration tests (mocked downloads)
-│   └── test_normalize.py    # unit tests for ID normalization
+│   ├── test_bump_version.py # unit tests for version bumping
+│   └── test_oscal_id.py     # unit tests for ID normalization
 ├── baseline/                # generated output (committed by CI)
-├── examples/                # local example output (git-ignored)
+│   └── historical/          # timestamped copies
+├── scripts/
+│   └── bump_version.py      # automated package version management
 ├── .github/workflows/
 │   └── generate-baseline.yml
 ├── pyproject.toml
+├── Makefile
 └── LICENSE
 ```
 
@@ -135,23 +171,29 @@ Each run:
 1. Runs the test suite across Python 3.11, 3.12, and 3.13.
 2. Lints with [Ruff](https://docs.astral.sh/ruff/).
 3. Generates `baseline/nist80053r5_full_catalog_enriched.json` (latest, always the same path) and archives a timestamped copy under `baseline/historical/`.
-4. Commits and pushes the files back to the repo.
-5. Creates a **GitHub Release** (tagged `baseline-YYYY-MM-DD`) with the JSON attached as a downloadable asset and detailed release notes including control count, framework version, and generation timestamp.
+4. Automatically bumps the patch version in `pyproject.toml`.
+5. Commits and pushes the baseline files and the updated `pyproject.toml` back to the repo.
+6. Creates a **GitHub Release** (tagged `baseline-YYYY-MM-DD`) with the JSON attached as a downloadable asset and detailed release notes including control count, framework version, and generation timestamp.
 
 ## Development
 
+We use `make` to streamline everyday tasks.
+
 ```bash
 # install in editable mode with dev tools
-pip install -e ".[dev]"
+make install-dev
 
 # run tests
-pytest -v
+make test
 
-# lint
-ruff check src/ tests/
+# run tests and enforce 100% coverage
+make test-cov
 
-# format
-ruff format src/ tests/
+# auto-format code
+make format
+
+# lint code and run tests with coverage
+make check
 ```
 
 ## Data sources

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nist-cloud-security-baseline"
-version = "0.1.0"
+version = "0.1.1"
 description = "Generate a machine-readable, cloud-agnostic security baseline from NIST SP 800-53 Rev. 5 and SP 800-53B."
 readme = "README.md"
 license = { text = "MIT" }
@@ -31,14 +31,15 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "pandas>=2.0",
     "requests>=2.31",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "pytest-cov>=6.0",
     "ruff>=0.4",
+    "pre-commit>=4.0",
 ]
 
 [project.scripts]
@@ -49,7 +50,18 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["src", "."]
+addopts = "--cov=ncsb --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+source = ["ncsb", "scripts"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "if __name__ == .__main__.",
+    "pragma: no cover",
+]
 
 [tool.ruff]
 target-version = "py310"

@@ -2,6 +2,9 @@
 """
 CLI: Generate an enriched NIST SP 800-53 Rev.5 catalog JSON
 with NIST SP 800-53B baseline membership + derived severity/non-negotiable.
+
+Data is sourced from the official OSCAL JSON published by NIST at
+https://github.com/usnistgov/oscal-content
 """
 
 from __future__ import annotations
@@ -12,19 +15,17 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from io import StringIO
 from typing import Any
 
-import pandas as pd
 import requests
 
 from . import __version__
 from .urls import (
-    BASELINE_HIGH_CSV_URL,
-    BASELINE_LOW_CSV_URL,
-    BASELINE_MODERATE_CSV_URL,
-    BASELINE_PRIVACY_CSV_URL,
-    CONTROLS_CSV_URL,
+    BASELINE_HIGH_URL,
+    BASELINE_LOW_URL,
+    BASELINE_MODERATE_URL,
+    BASELINE_PRIVACY_URL,
+    CATALOG_URL,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,30 +34,37 @@ CONTROL_ID_RE = re.compile(r"^[A-Z]{2,3}-\d{1,3}$")
 ENHANCEMENT_RE = re.compile(r"^([A-Z]{2,3}-\d{1,3})\((\d+)\)$")
 
 
-def download_csv(url: str) -> pd.DataFrame:
-    r = requests.get(url, timeout=60)
+# ---------------------------------------------------------------------------
+# Download
+# ---------------------------------------------------------------------------
+
+
+def download_json(url: str) -> dict[str, Any]:
+    r = requests.get(url, timeout=120)
     r.raise_for_status()
-    content = r.content.decode("utf-8", errors="replace")
-    return pd.read_csv(StringIO(content))
+    return r.json()
 
 
-def normalize_id(raw: Any) -> str:
-    if raw is None:
-        return ""
-    s = str(raw).strip().upper().replace(" ", "")
-    m = ENHANCEMENT_RE.match(s)
-    if m:
-        base, num = m.group(1), str(int(m.group(2)))
-        return f"{base}({num})"
-    return s
+# ---------------------------------------------------------------------------
+# OSCAL ID helpers
+# ---------------------------------------------------------------------------
 
 
-def is_base(control_id: str) -> bool:
-    return bool(CONTROL_ID_RE.match(control_id))
+def oscal_id_to_control_id(oscal_id: str) -> str:
+    """Convert an OSCAL-style ID to the canonical display form.
+
+    ``"ac-2"``   -> ``"AC-2"``
+    ``"ac-2.1"`` -> ``"AC-2(1)"``
+    """
+    parts = oscal_id.split(".")
+    base = parts[0].upper()
+    if len(parts) == 2:
+        return f"{base}({int(parts[1])})"
+    return base
 
 
-def parent_of(enh_id: str) -> str | None:
-    m = ENHANCEMENT_RE.match(enh_id)
+def parent_of(control_id: str) -> str | None:
+    m = ENHANCEMENT_RE.match(control_id)
     return m.group(1) if m else None
 
 
@@ -65,61 +73,83 @@ def family_of(control_id: str) -> str:
     return base.split("-")[0]
 
 
-def baseline_id_set(df: pd.DataFrame) -> set[str]:
-    df.columns = [c.strip() for c in df.columns]
-    candidates = [
-        "Control Identifier",
-        "Control ID",
-        "identifier",
-        "Control",
-        "Control Number",
-        "Control Identifier (800-53)",
-    ]
-    col = next((c for c in candidates if c in df.columns), df.columns[0])
-    return {normalize_id(v) for v in df[col].dropna().tolist() if normalize_id(v)}
+# ---------------------------------------------------------------------------
+# OSCAL catalog parsing
+# ---------------------------------------------------------------------------
 
 
-def controls_catalog(df: pd.DataFrame) -> dict[str, dict[str, Any]]:
-    df.columns = [c.strip() for c in df.columns]
+def _collect_prose(parts: list[dict[str, Any]], target_name: str) -> str | None:
+    """Recursively collect ``prose`` from *parts* whose ``name`` equals *target_name*."""
+    fragments: list[str] = []
+    for part in parts:
+        if part.get("name") == target_name:
+            if prose := part.get("prose"):
+                fragments.append(prose)
+            for sub in part.get("parts", []):
+                if sub_prose := sub.get("prose"):
+                    fragments.append(sub_prose)
+        elif part.get("parts"):
+            nested = _collect_prose(part["parts"], target_name)
+            if nested:
+                fragments.append(nested)
+    return "\n".join(fragments) if fragments else None
 
-    def pick(*names: str) -> str | None:
-        for n in names:
-            if n in df.columns:
-                return n
-        return None
 
-    id_col = pick("Control Identifier", "Control ID", "identifier", "Control")
-    name_col = pick("Control Name", "Name", "name")
-    control_text_col = pick("Control", "Control Text", "Statement", "control_text")
-    discussion_col = pick("Discussion", "Supplemental Guidance", "discussion")
-    related_col = pick("Related Controls", "Related", "related")
+def _related_controls(links: list[dict[str, Any]]) -> str | None:
+    ids: list[str] = []
+    for link in links:
+        if link.get("rel") == "related":
+            href = link.get("href", "")
+            if href.startswith("#"):
+                ids.append(oscal_id_to_control_id(href[1:]))
+    return ", ".join(ids) if ids else None
 
-    if id_col is None:
-        raise ValueError("Could not find a control identifier column in controls CSV.")
 
+def _parse_control(ctrl: dict[str, Any], parent_id: str | None) -> dict[str, Any]:
+    cid = oscal_id_to_control_id(ctrl["id"])
+    parts = ctrl.get("parts", [])
+    return {
+        "control_id": cid,
+        "control_name": ctrl.get("title"),
+        "family": family_of(cid),
+        "control_text": _collect_prose(parts, "statement"),
+        "discussion": _collect_prose(parts, "guidance"),
+        "related_controls": _related_controls(ctrl.get("links", [])),
+        "parent_control_id": parent_id,
+    }
+
+
+def parse_oscal_catalog(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return ``{control_id: record}`` from an OSCAL catalog JSON."""
     out: dict[str, dict[str, Any]] = {}
-
-    for _, row in df.iterrows():
-        cid = normalize_id(row.get(id_col))
-        if not cid:
-            continue
-
-        # keep only valid base controls and enhancements
-        base = parent_of(cid) or cid
-        if not (is_base(base) or ENHANCEMENT_RE.match(cid)):
-            continue
-
-        out[cid] = {
-            "control_id": cid,
-            "control_name": (str(row.get(name_col)).strip() if name_col else None),
-            "family": family_of(cid),
-            "control_text": (str(row.get(control_text_col)).strip() if control_text_col else None),
-            "discussion": (str(row.get(discussion_col)).strip() if discussion_col else None),
-            "related_controls": (str(row.get(related_col)).strip() if related_col else None),
-            "parent_control_id": parent_of(cid),
-        }
-
+    for group in data.get("catalog", {}).get("groups", []):
+        for ctrl in group.get("controls", []):
+            rec = _parse_control(ctrl, parent_id=None)
+            out[rec["control_id"]] = rec
+            for enh in ctrl.get("controls", []):
+                enh_rec = _parse_control(enh, parent_id=rec["control_id"])
+                out[enh_rec["control_id"]] = enh_rec
     return out
+
+
+# ---------------------------------------------------------------------------
+# OSCAL profile parsing
+# ---------------------------------------------------------------------------
+
+
+def parse_oscal_profile(data: dict[str, Any]) -> set[str]:
+    """Return the set of canonical control IDs selected by an OSCAL profile."""
+    ids: set[str] = set()
+    for imp in data.get("profile", {}).get("imports", []):
+        for ic in imp.get("include-controls", []):
+            for wid in ic.get("with-ids", []):
+                ids.add(oscal_id_to_control_id(wid))
+    return ids
+
+
+# ---------------------------------------------------------------------------
+# Enrichment (unchanged from CSV era)
+# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -159,15 +189,20 @@ def non_negotiable_from_membership(m: dict[str, bool], rules: Rules) -> bool:
     return bool(m["moderate"] or m["high"])
 
 
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ncsb-generate", description="Generate NIST Cloud Security Baseline JSON")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
-    p.add_argument("--controls_csv_url", default=CONTROLS_CSV_URL)
-    p.add_argument("--baseline_low_csv_url", default=BASELINE_LOW_CSV_URL)
-    p.add_argument("--baseline_moderate_csv_url", default=BASELINE_MODERATE_CSV_URL)
-    p.add_argument("--baseline_high_csv_url", default=BASELINE_HIGH_CSV_URL)
-    p.add_argument("--baseline_privacy_csv_url", default=BASELINE_PRIVACY_CSV_URL)
+    p.add_argument("--catalog_url", default=CATALOG_URL)
+    p.add_argument("--baseline_low_url", default=BASELINE_LOW_URL)
+    p.add_argument("--baseline_moderate_url", default=BASELINE_MODERATE_URL)
+    p.add_argument("--baseline_high_url", default=BASELINE_HIGH_URL)
+    p.add_argument("--baseline_privacy_url", default=BASELINE_PRIVACY_URL)
 
     p.add_argument("--non_negotiable_min_baseline", choices=["moderate", "high"], default="moderate")
     p.add_argument("--out", default="nist80053r5_full_catalog_enriched.json")
@@ -201,17 +236,17 @@ def main() -> None:
     args = build_arg_parser().parse_args()
     rules = Rules(non_negotiable_min_baseline=args.non_negotiable_min_baseline)
 
-    controls_df = download_csv(args.controls_csv_url)
-    low_df = download_csv(args.baseline_low_csv_url)
-    mod_df = download_csv(args.baseline_moderate_csv_url)
-    high_df = download_csv(args.baseline_high_csv_url)
-    priv_df = download_csv(args.baseline_privacy_csv_url)
+    catalog_data = download_json(args.catalog_url)
+    low_data = download_json(args.baseline_low_url)
+    mod_data = download_json(args.baseline_moderate_url)
+    high_data = download_json(args.baseline_high_url)
+    priv_data = download_json(args.baseline_privacy_url)
 
-    controls = controls_catalog(controls_df)
-    low = baseline_id_set(low_df)
-    moderate = baseline_id_set(mod_df)
-    high = baseline_id_set(high_df)
-    privacy = baseline_id_set(priv_df)
+    controls = parse_oscal_catalog(catalog_data)
+    low = parse_oscal_profile(low_data)
+    moderate = parse_oscal_profile(mod_data)
+    high = parse_oscal_profile(high_data)
+    privacy = parse_oscal_profile(priv_data)
 
     log_orphan_baselines(
         set(controls.keys()),
@@ -237,7 +272,7 @@ def main() -> None:
         "framework": "NIST SP 800-53 Rev. 5",
         "reference": {
             "publication": "https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final",
-            "downloads": "https://csrc.nist.gov/projects/risk-management/sp800-53-controls/downloads",
+            "oscal_content": "https://github.com/usnistgov/oscal-content",
         },
         "rules": {
             "severity_definition": {

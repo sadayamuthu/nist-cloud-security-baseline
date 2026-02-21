@@ -1,58 +1,179 @@
-"""Integration test: run main() with mocked CSV downloads and verify output JSON."""
+"""Tests for ncsb.generate — integration and unit."""
 
 import json
 import logging
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-import pandas as pd
-
-from src.ncsb.generate import log_orphan_baselines, main
-
-FAKE_CONTROLS = pd.DataFrame(
-    {
-        "Control Identifier": ["AC-1", "AC-2", "AC-2(1)", "SC-7"],
-        "Control Name": [
-            "Policy and Procedures",
-            "Account Management",
-            "Account Management | Automated System Account Management",
-            "Boundary Protection",
-        ],
-        "Control": [
-            "Develop an access control policy.",
-            "Define and manage system accounts.",
-            "Support management of system accounts using automated mechanisms.",
-            "Monitor and control communications at the boundary.",
-        ],
-        "Discussion": ["None.", "None.", "None.", "None."],
-        "Related Controls": ["AC-2", "AC-3,AC-5", "AC-2", "AC-4,SC-8"],
-    }
+from ncsb.generate import (
+    Rules,
+    _collect_prose,
+    _related_controls,
+    download_json,
+    family_of,
+    log_orphan_baselines,
+    main,
+    membership_flags,
+    non_negotiable_from_membership,
+    parent_of,
+    parse_oscal_catalog,
+    parse_oscal_profile,
+    severity_from_membership,
 )
 
-FAKE_LOW = pd.DataFrame({"Control Identifier": ["AC-1", "AC-2"]})
-FAKE_MODERATE = pd.DataFrame({"Control Identifier": ["AC-1", "AC-2", "AC-2(1)", "SC-7"]})
-FAKE_HIGH = pd.DataFrame({"Control Identifier": ["AC-1", "AC-2", "AC-2(1)", "SC-7"]})
-FAKE_PRIVACY = pd.DataFrame({"Control Identifier": ["AC-1"]})
+# ---------------------------------------------------------------------------
+# Fake OSCAL structures
+# ---------------------------------------------------------------------------
+
+FAKE_CATALOG = {
+    "catalog": {
+        "uuid": "test-uuid",
+        "metadata": {
+            "title": "Test",
+            "version": "5.2.0",
+            "oscal-version": "1.1.3",
+            "last-modified": "2025-01-01T00:00:00Z",
+        },
+        "groups": [
+            {
+                "id": "ac",
+                "class": "family",
+                "title": "Access Control",
+                "controls": [
+                    {
+                        "id": "ac-1",
+                        "title": "Policy and Procedures",
+                        "links": [
+                            {"href": "#ac-2", "rel": "related"},
+                        ],
+                        "parts": [
+                            {
+                                "id": "ac-1_smt",
+                                "name": "statement",
+                                "prose": "Develop an access control policy.",
+                            },
+                            {
+                                "id": "ac-1_gdn",
+                                "name": "guidance",
+                                "prose": "None.",
+                            },
+                        ],
+                    },
+                    {
+                        "id": "ac-2",
+                        "title": "Account Management",
+                        "links": [
+                            {"href": "#ac-3", "rel": "related"},
+                            {"href": "#ac-5", "rel": "related"},
+                        ],
+                        "parts": [
+                            {
+                                "id": "ac-2_smt",
+                                "name": "statement",
+                                "prose": "Define and manage system accounts.",
+                            },
+                            {
+                                "id": "ac-2_gdn",
+                                "name": "guidance",
+                                "prose": "None.",
+                            },
+                        ],
+                        "controls": [
+                            {
+                                "id": "ac-2.1",
+                                "title": "Automated System Account Management",
+                                "links": [
+                                    {"href": "#ac-2", "rel": "related"},
+                                ],
+                                "parts": [
+                                    {
+                                        "id": "ac-2.1_smt",
+                                        "name": "statement",
+                                        "prose": "Support management of system accounts using automated mechanisms.",
+                                    },
+                                    {
+                                        "id": "ac-2.1_gdn",
+                                        "name": "guidance",
+                                        "prose": "None.",
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                "id": "sc",
+                "class": "family",
+                "title": "System and Communications Protection",
+                "controls": [
+                    {
+                        "id": "sc-7",
+                        "title": "Boundary Protection",
+                        "links": [
+                            {"href": "#ac-4", "rel": "related"},
+                            {"href": "#sc-8", "rel": "related"},
+                        ],
+                        "parts": [
+                            {
+                                "id": "sc-7_smt",
+                                "name": "statement",
+                                "prose": "Monitor and control communications at the boundary.",
+                            },
+                            {
+                                "id": "sc-7_gdn",
+                                "name": "guidance",
+                                "prose": "None.",
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    }
+}
 
 
-def _mock_download_csv(url: str) -> pd.DataFrame:
-    """Return the appropriate fake DataFrame based on the URL substring."""
+def _profile(ids: list[str]) -> dict:
+    return {
+        "profile": {
+            "uuid": "test-uuid",
+            "metadata": {
+                "title": "Test Profile",
+                "version": "5.2.0",
+                "oscal-version": "1.1.3",
+                "last-modified": "2025-01-01T00:00:00Z",
+            },
+            "imports": [
+                {"include-controls": [{"with-ids": ids}]},
+            ],
+        }
+    }
+
+
+FAKE_LOW = _profile(["ac-1", "ac-2"])
+FAKE_MODERATE = _profile(["ac-1", "ac-2", "ac-2.1", "sc-7"])
+FAKE_HIGH = _profile(["ac-1", "ac-2", "ac-2.1", "sc-7"])
+FAKE_PRIVACY = _profile(["ac-1"])
+
+
+def _mock_download_json(url: str) -> dict:
     lower = url.lower()
-    if "catalog" in lower or "controls" in lower:
-        return FAKE_CONTROLS.copy()
+    if "catalog" in lower:
+        return FAKE_CATALOG
     if "low" in lower:
-        return FAKE_LOW.copy()
+        return FAKE_LOW
     if "moderate" in lower:
-        return FAKE_MODERATE.copy()
+        return FAKE_MODERATE
     if "high" in lower:
-        return FAKE_HIGH.copy()
+        return FAKE_HIGH
     if "privacy" in lower:
-        return FAKE_PRIVACY.copy()
+        return FAKE_PRIVACY
     raise ValueError(f"Unexpected URL in test: {url}")
 
 
-@patch("src.ncsb.generate.download_csv", side_effect=_mock_download_csv)
+@patch("ncsb.generate.download_json", side_effect=_mock_download_json)
 def test_main_produces_valid_json(mock_dl):
     with tempfile.TemporaryDirectory() as tmpdir:
         out_path = str(Path(tmpdir) / "output.json")
@@ -95,7 +216,7 @@ def test_main_produces_valid_json(mock_dl):
         assert isinstance(ctrl["non_negotiable"], bool)
 
 
-@patch("src.ncsb.generate.download_csv", side_effect=_mock_download_csv)
+@patch("ncsb.generate.download_json", side_effect=_mock_download_json)
 def test_baseline_membership_accuracy(mock_dl):
     with tempfile.TemporaryDirectory() as tmpdir:
         out_path = str(Path(tmpdir) / "output.json")
@@ -118,7 +239,7 @@ def test_baseline_membership_accuracy(mock_dl):
     assert sc7["non_negotiable"] is True
 
 
-@patch("src.ncsb.generate.download_csv", side_effect=_mock_download_csv)
+@patch("ncsb.generate.download_json", side_effect=_mock_download_json)
 def test_enhancement_parent_linkage(mock_dl):
     with tempfile.TemporaryDirectory() as tmpdir:
         out_path = str(Path(tmpdir) / "output.json")
@@ -135,7 +256,7 @@ def test_enhancement_parent_linkage(mock_dl):
     assert by_id["AC-2(1)"]["family"] == "AC"
 
 
-@patch("src.ncsb.generate.download_csv", side_effect=_mock_download_csv)
+@patch("ncsb.generate.download_json", side_effect=_mock_download_json)
 def test_non_negotiable_high_only(mock_dl):
     """When --non_negotiable_min_baseline=high, only high-baseline controls are non-negotiable."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -182,3 +303,122 @@ def test_log_orphan_baselines_silent_when_no_orphans(caplog):
             privacy=set(),
         )
     assert caplog.text == ""
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for individual functions
+# ---------------------------------------------------------------------------
+
+
+def test_download_json():
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"catalog": {}}
+    with patch("ncsb.generate.requests.get", return_value=mock_resp) as mock_get:
+        result = download_json("https://example.com/data.json")
+    mock_get.assert_called_once_with("https://example.com/data.json", timeout=120)
+    mock_resp.raise_for_status.assert_called_once()
+    assert result == {"catalog": {}}
+
+
+def test_collect_prose_with_sub_parts():
+    """Cover the branch where a matching part has nested sub-parts with prose."""
+    parts = [
+        {
+            "name": "statement",
+            "prose": "Top-level statement.",
+            "parts": [
+                {"prose": "Sub-part A."},
+                {"prose": "Sub-part B."},
+            ],
+        },
+    ]
+    assert _collect_prose(parts, "statement") == "Top-level statement.\nSub-part A.\nSub-part B."
+
+
+def test_collect_prose_nested_under_non_matching_parent():
+    """Cover the elif branch: statement buried inside a wrapper with a different name."""
+    parts = [
+        {
+            "name": "assessment-objective",
+            "parts": [
+                {"name": "statement", "prose": "Nested statement."},
+            ],
+        },
+    ]
+    assert _collect_prose(parts, "statement") == "Nested statement."
+
+
+def test_collect_prose_returns_none_when_empty():
+    assert _collect_prose([], "statement") is None
+
+
+def test_related_controls_ignores_non_related_links():
+    links = [
+        {"href": "#ac-1", "rel": "related"},
+        {"href": "https://example.com", "rel": "reference"},
+        {"href": "#ac-2", "rel": "related"},
+    ]
+    assert _related_controls(links) == "AC-1, AC-2"
+
+
+def test_related_controls_returns_none_when_empty():
+    assert _related_controls([]) is None
+
+
+def test_severity_high_only():
+    rules = Rules()
+    m = {"low": False, "moderate": False, "high": True, "privacy": False}
+    assert severity_from_membership(m, rules) == "CRITICAL"
+
+
+def test_severity_privacy_only():
+    rules = Rules()
+    m = {"low": False, "moderate": False, "high": False, "privacy": True}
+    assert severity_from_membership(m, rules) == "MEDIUM"
+
+
+def test_severity_no_baseline():
+    rules = Rules()
+    m = {"low": False, "moderate": False, "high": False, "privacy": False}
+    assert severity_from_membership(m, rules) == "LOW"
+
+
+def test_parent_of_base_control():
+    assert parent_of("AC-2") is None
+
+
+def test_parent_of_enhancement():
+    assert parent_of("AC-2(1)") == "AC-2"
+
+
+def test_family_of_base():
+    assert family_of("SC-7") == "SC"
+
+
+def test_family_of_enhancement():
+    assert family_of("AC-2(1)") == "AC"
+
+
+def test_membership_flags():
+    flags = membership_flags("AC-1", low={"AC-1"}, moderate={"AC-1"}, high=set(), privacy=set())
+    assert flags == {"low": True, "moderate": True, "high": False, "privacy": False}
+
+
+def test_non_negotiable_moderate_default():
+    rules = Rules()
+    assert non_negotiable_from_membership({"moderate": True, "high": False}, rules) is True
+    assert non_negotiable_from_membership({"moderate": False, "high": False}, rules) is False
+
+
+def test_parse_oscal_catalog_empty():
+    assert parse_oscal_catalog({}) == {}
+    assert parse_oscal_catalog({"catalog": {}}) == {}
+
+
+def test_parse_oscal_profile_empty():
+    assert parse_oscal_profile({}) == set()
+    assert parse_oscal_profile({"profile": {}}) == set()
+
+
+def test_main_module_importable():
+    import ncsb.__main__  # noqa: F401

@@ -113,12 +113,16 @@ nist-cloud-security-baseline/
 │   └── urls.py              # default NIST download URLs
 ├── tests/
 │   ├── test_generate.py     # integration tests (mocked downloads)
-│   └── test_normalize.py    # unit tests for ID normalization
+│   ├── test_bump_version.py # unit tests for version bumping
+│   └── test_oscal_id.py     # unit tests for ID normalization
 ├── baseline/                # generated output (committed by CI)
-├── examples/                # local example output (git-ignored)
+│   └── historical/          # timestamped copies
+├── scripts/
+│   └── bump_version.py      # automated package version management
 ├── .github/workflows/
 │   └── generate-baseline.yml
 ├── pyproject.toml
+├── Makefile
 └── LICENSE
 ```
 
@@ -135,23 +139,29 @@ Each run:
 1. Runs the test suite across Python 3.11, 3.12, and 3.13.
 2. Lints with [Ruff](https://docs.astral.sh/ruff/).
 3. Generates `baseline/nist80053r5_full_catalog_enriched.json` (latest, always the same path) and archives a timestamped copy under `baseline/historical/`.
-4. Commits and pushes the files back to the repo.
-5. Creates a **GitHub Release** (tagged `baseline-YYYY-MM-DD`) with the JSON attached as a downloadable asset and detailed release notes including control count, framework version, and generation timestamp.
+4. Automatically bumps the patch version in `pyproject.toml`.
+5. Commits and pushes the baseline files and the updated `pyproject.toml` back to the repo.
+6. Creates a **GitHub Release** (tagged `baseline-YYYY-MM-DD`) with the JSON attached as a downloadable asset and detailed release notes including control count, framework version, and generation timestamp.
 
 ## Development
 
+We use `make` to streamline everyday tasks.
+
 ```bash
 # install in editable mode with dev tools
-pip install -e ".[dev]"
+make install-dev
 
 # run tests
-pytest -v
+make test
 
-# lint
-ruff check src/ tests/
+# run tests and enforce 100% coverage
+make test-cov
 
-# format
-ruff format src/ tests/
+# auto-format code
+make format
+
+# lint code and run tests with coverage
+make check
 ```
 
 ## Data sources

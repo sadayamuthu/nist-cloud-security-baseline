@@ -63,6 +63,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add baseline/
           if ! git diff --cached --quiet; then
+            python scripts/bump_version.py patch
+            git add pyproject.toml
             git commit -m "baseline: update enriched catalog $(date -u +%Y-%m-%d)"
             git push
             echo "pushed=true" >> "$GITHUB_OUTPUT"
@@ -115,9 +117,9 @@ jobs:
 
           ### Data source
 
-          [NIST SP 800-53 Rev. 5 Downloads](https://csrc.nist.gov/projects/risk-management/sp800-53-controls/downloads)
+          [NIST OSCAL Content](https://github.com/usnistgov/oscal-content) (official OSCAL JSON)
 
-          > This release was generated automatically by GitHub Actions from live NIST data.
+          > This release was generated automatically by GitHub Actions from NIST OSCAL data.
           EOF
           )"
 
@@ -130,6 +132,7 @@ jobs:
             --description "Machine-readable NIST SP 800-53 Rev. 5 cloud security baseline with enriched severity, baseline membership, and non-negotiable flags. Auto-updated daily." \
             --add-topic nist \
             --add-topic nist-800-53 \
+            --add-topic oscal \
             --add-topic cloud-security \
             --add-topic compliance \
             --add-topic security-baseline \

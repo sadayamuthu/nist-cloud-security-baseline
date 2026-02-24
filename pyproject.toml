@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nist-cloud-security-baseline"
-version = "0.1.4"
+version = "0.1.5"
 description = "Generate a machine-readable, cloud-agnostic security baseline from NIST SP 800-53 Rev. 5 and SP 800-53B."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-authors = [{ name = "Karthik" }]
+authors = [{ name = "Karthikeyan Sadayamuthu" }]
 keywords = [
     "nist",
     "800-53",

@@ -15,3 +15,13 @@ BASELINE_MODERATE_URL = f"{_BASE}/NIST_SP-800-53_rev5_MODERATE-baseline_profile.
 BASELINE_HIGH_URL = f"{_BASE}/NIST_SP-800-53_rev5_HIGH-baseline_profile.json"
 
 BASELINE_PRIVACY_URL = f"{_BASE}/NIST_SP-800-53_rev5_PRIVACY-baseline_profile.json"
+
+_FEDRAMP_BASE = "https://raw.githubusercontent.com/GSA/fedramp-automation/master/dist/content/rev5/baselines/json"
+
+FEDRAMP_LI_SAAS_URL = f"{_FEDRAMP_BASE}/FedRAMP_rev5_LI-SaaS-baseline_profile.json"
+
+FEDRAMP_LOW_URL = f"{_FEDRAMP_BASE}/FedRAMP_rev5_LOW-baseline_profile.json"
+
+FEDRAMP_MODERATE_URL = f"{_FEDRAMP_BASE}/FedRAMP_rev5_MODERATE-baseline_profile.json"
+
+FEDRAMP_HIGH_URL = f"{_FEDRAMP_BASE}/FedRAMP_rev5_HIGH-baseline_profile.json"

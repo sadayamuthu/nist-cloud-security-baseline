@@ -26,6 +26,10 @@ from .urls import (
     BASELINE_MODERATE_URL,
     BASELINE_PRIVACY_URL,
     CATALOG_URL,
+    FEDRAMP_HIGH_URL,
+    FEDRAMP_LI_SAAS_URL,
+    FEDRAMP_LOW_URL,
+    FEDRAMP_MODERATE_URL,
 )
 
 logger = logging.getLogger(__name__)
@@ -204,6 +208,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--baseline_high_url", default=BASELINE_HIGH_URL)
     p.add_argument("--baseline_privacy_url", default=BASELINE_PRIVACY_URL)
 
+    p.add_argument("--fedramp_lisaas_url", default=FEDRAMP_LI_SAAS_URL)
+    p.add_argument("--fedramp_low_url", default=FEDRAMP_LOW_URL)
+    p.add_argument("--fedramp_moderate_url", default=FEDRAMP_MODERATE_URL)
+    p.add_argument("--fedramp_high_url", default=FEDRAMP_HIGH_URL)
+
     p.add_argument("--non_negotiable_min_baseline", choices=["moderate", "high"], default="moderate")
     p.add_argument("--out", default="nist80053r5_full_catalog_enriched.json")
 
@@ -242,11 +251,21 @@ def main() -> None:
     high_data = download_json(args.baseline_high_url)
     priv_data = download_json(args.baseline_privacy_url)
 
+    fed_li_data = download_json(args.fedramp_lisaas_url)
+    fed_low_data = download_json(args.fedramp_low_url)
+    fed_mod_data = download_json(args.fedramp_moderate_url)
+    fed_high_data = download_json(args.fedramp_high_url)
+
     controls = parse_oscal_catalog(catalog_data)
     low = parse_oscal_profile(low_data)
     moderate = parse_oscal_profile(mod_data)
     high = parse_oscal_profile(high_data)
     privacy = parse_oscal_profile(priv_data)
+
+    fed_lisaas = parse_oscal_profile(fed_li_data)
+    fed_low = parse_oscal_profile(fed_low_data)
+    fed_moderate = parse_oscal_profile(fed_mod_data)
+    fed_high = parse_oscal_profile(fed_high_data)
 
     log_orphan_baselines(
         set(controls.keys()),
@@ -261,6 +280,12 @@ def main() -> None:
         m = membership_flags(cid, low, moderate, high, privacy)
         rec_out = dict(rec)
         rec_out["baseline_membership"] = m
+        rec_out["fedramp_membership"] = {
+            "li_saas": cid in fed_lisaas,
+            "low": cid in fed_low,
+            "moderate": cid in fed_moderate,
+            "high": cid in fed_high,
+        }
         rec_out["severity"] = severity_from_membership(m, rules)
         rec_out["non_negotiable"] = non_negotiable_from_membership(m, rules)
         enriched.append(rec_out)

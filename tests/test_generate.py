@@ -157,11 +157,25 @@ FAKE_MODERATE = _profile(["ac-1", "ac-2", "ac-2.1", "sc-7"])
 FAKE_HIGH = _profile(["ac-1", "ac-2", "ac-2.1", "sc-7"])
 FAKE_PRIVACY = _profile(["ac-1"])
 
+FAKE_FEDRAMP_LI_SAAS = _profile(["ac-1"])
+FAKE_FEDRAMP_LOW = _profile(["ac-1", "ac-2"])
+FAKE_FEDRAMP_MODERATE = _profile(["ac-1", "ac-2", "sc-7"])
+FAKE_FEDRAMP_HIGH = _profile(["ac-1", "ac-2", "ac-2.1", "sc-7"])
+
 
 def _mock_download_json(url: str) -> dict:
     lower = url.lower()
     if "catalog" in lower:
         return FAKE_CATALOG
+    if "fedramp" in lower:
+        if "li-saas" in lower:
+            return FAKE_FEDRAMP_LI_SAAS
+        if "low" in lower:
+            return FAKE_FEDRAMP_LOW
+        if "moderate" in lower:
+            return FAKE_FEDRAMP_MODERATE
+        if "high" in lower:
+            return FAKE_FEDRAMP_HIGH
     if "low" in lower:
         return FAKE_LOW
     if "moderate" in lower:
@@ -204,6 +218,7 @@ def test_main_produces_valid_json(mock_dl):
         "related_controls",
         "parent_control_id",
         "baseline_membership",
+        "fedramp_membership",
         "severity",
         "non_negotiable",
     }
@@ -212,6 +227,9 @@ def test_main_produces_valid_json(mock_dl):
         bm = ctrl["baseline_membership"]
         assert set(bm.keys()) == {"low", "moderate", "high", "privacy"}
         assert all(isinstance(v, bool) for v in bm.values())
+        fm = ctrl["fedramp_membership"]
+        assert set(fm.keys()) == {"li_saas", "low", "moderate", "high"}
+        assert all(isinstance(v, bool) for v in fm.values())
         assert ctrl["severity"] in {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
         assert isinstance(ctrl["non_negotiable"], bool)
 
@@ -230,11 +248,13 @@ def test_baseline_membership_accuracy(mock_dl):
 
     ac1 = by_id["AC-1"]
     assert ac1["baseline_membership"] == {"low": True, "moderate": True, "high": True, "privacy": True}
+    assert ac1["fedramp_membership"] == {"li_saas": True, "low": True, "moderate": True, "high": True}
     assert ac1["severity"] == "MEDIUM"
     assert ac1["non_negotiable"] is True
 
     sc7 = by_id["SC-7"]
     assert sc7["baseline_membership"] == {"low": False, "moderate": True, "high": True, "privacy": False}
+    assert sc7["fedramp_membership"] == {"li_saas": False, "low": False, "moderate": True, "high": True}
     assert sc7["severity"] == "HIGH"
     assert sc7["non_negotiable"] is True
 

@@ -1,6 +1,12 @@
 # NIST Cloud Security Baseline (NCSB)
 
-A Python tool that generates a **machine-readable, cloud-agnostic security baseline** from authoritative NIST publications. It merges the full NIST SP 800-53 Rev. 5 control catalog with the SP 800-53B baseline profiles and the FedRAMP OSCAL baselines, producing a single enriched JSON file ready for downstream automation.
+**NCSB** publishes a daily, machine-readable, cloud-agnostic security baseline derived from authoritative NIST publications. Fetch it directly — no install required:
+
+```
+https://openastra.org/ncsb/catalog/v0.1/latest.json
+```
+
+The catalog merges the full NIST SP 800-53 Rev. 5 control catalog with SP 800-53B baseline profiles and FedRAMP OSCAL baselines, enriching every control with baseline membership flags, a derived severity level, and a non-negotiable indicator.
 
 ## Why this exists
 
@@ -11,6 +17,19 @@ Cloud security teams need a common starting point that is vendor-neutral:
 - **FedRAMP Baselines** define the controls required for cloud service providers serving the US government (LI-SaaS, Low, Moderate, High).
 
 These documents are published as separate JSON profiles by NIST and the GSA. NCSB downloads them, joins the data, and enriches every control with baseline membership flags, a derived severity level, and a non-negotiable indicator — all in one JSON file you can feed into policy engines, compliance dashboards, IaC scanners, or cloud-provider mapping tools.
+
+## Distribution
+
+The catalog is published daily at a stable URL — no package to install.
+
+| Artifact | URL | Updated |
+|---|---|---|
+| Latest catalog | `https://openastra.org/ncsb/catalog/v0.1/latest.json` | daily |
+| Historical catalog | `https://openastra.org/ncsb/catalog/v0.1/historical/YYYY-MM-DD.json` | daily |
+| JSON Schema | `https://openastra.org/ncsb/schema/v0.1/ncsb.json` | on schema change |
+| YAML Schema | `https://openastra.org/ncsb/schema/v0.1/ncsb.yaml` | on schema change |
+
+Schema version (`v0.1`) is bumped only when the catalog output structure changes, creating a new versioned URL path.
 
 ## Features
 
@@ -23,25 +42,20 @@ These documents are published as separate JSON profiles by NIST and the GSA. NCS
 
 ## Quick start
 
+Fetch the catalog directly:
+
 ```bash
-# clone and set up
-git clone https://github.com/<your-org>/nist-cloud-security-baseline.git
-cd nist-cloud-security-baseline
-python -m venv .venv
-source .venv/bin/activate
-
-# install (editable, with dev tools)
-pip install -e ".[dev]"
-
-# generate the enriched baseline
-ncsb-generate --out examples/nist80053r5_full_catalog_enriched.json
+curl -s https://openastra.org/ncsb/catalog/v0.1/latest.json | jq '.count'
 ```
 
-Or run directly without installing as a package:
+To run the generator locally (e.g. for self-hosting or development):
 
 ```bash
-pip install pandas requests
-python -m src.ncsb.generate --out examples/nist80053r5_full_catalog_enriched.json
+git clone https://github.com/sadayamuthu/nist-cloud-security-baseline.git
+cd nist-cloud-security-baseline
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+python -m ncsb.generate --out baseline/nist80053r5_full_catalog_enriched.json
 ```
 
 ## CLI options
@@ -148,21 +162,26 @@ Each item in `controls[]`:
 
 ```
 nist-cloud-security-baseline/
+├── spec/
+│   ├── VERSION              # schema version (semver → URL path)
+│   └── schemas/
+│       ├── ncsb-v0.1.json   # JSON Schema for catalog output
+│       └── ncsb-v0.1.yaml   # YAML equivalent
 ├── src/ncsb/
-│   ├── __init__.py          # package version
-│   ├── __main__.py          # python -m entry point
-│   ├── generate.py          # CLI and core logic
-│   └── urls.py              # default NIST download URLs
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── generate.py
+│   └── urls.py
 ├── tests/
-│   ├── test_generate.py     # integration tests (mocked downloads)
-│   ├── test_bump_version.py # unit tests for version bumping
-│   └── test_oscal_id.py     # unit tests for ID normalization
-├── baseline/                # generated output (committed by CI)
-│   └── historical/          # timestamped copies
-├── scripts/
-│   └── bump_version.py      # automated package version management
+│   ├── test_generate.py
+│   ├── test_oscal_id.py
+│   └── test_schema_validation.py
+├── baseline/
+│   └── historical/
 ├── .github/workflows/
-│   └── generate-baseline.yml
+│   ├── develop.yml
+│   ├── main-release.yml
+│   └── schema-release.yml
 ├── pyproject.toml
 ├── Makefile
 └── LICENSE
@@ -170,20 +189,20 @@ nist-cloud-security-baseline/
 
 ## Automation (GitHub Actions)
 
-The workflow at `.github/workflows/generate-baseline.yml` runs:
+Two workflows handle publishing:
 
-- **On schedule** — daily at 06:00 UTC
-- **On push** to `main`
-- **On demand** via *Actions > Generate NIST Cloud Security Baseline > Run workflow*
+**`main-release.yml`** — runs daily at 06:00 UTC (and on push to `main`, or manually):
+1. Runs the test suite across Python 3.11, 3.12, and 3.13
+2. Generates `baseline/nist80053r5_full_catalog_enriched.json` and commits it to this repo
+3. Pushes `latest.json` and a dated historical copy to `openastra.org/ncsb/catalog/v0.1/`
+4. Creates a GitHub Release (tag + changelog — the catalog URL is the artifact)
 
-Each run:
+**`schema-release.yml`** — triggers only when `spec/**` changes:
+1. Reads `spec/VERSION` (semver), validates it, checks the tag doesn't already exist
+2. Pushes `ncsb.json` and `ncsb.yaml` to `openastra.org/ncsb/schema/v0.1/`
+3. Creates a GitHub Release tagged `spec-v{VERSION}` with schema files attached
 
-1. Runs the test suite across Python 3.11, 3.12, and 3.13.
-2. Lints with [Ruff](https://docs.astral.sh/ruff/).
-3. Generates `baseline/nist80053r5_full_catalog_enriched.json` (latest, always the same path) and archives a timestamped copy under `baseline/historical/`.
-4. Automatically bumps the patch version in `pyproject.toml`.
-5. Commits and pushes the baseline files and the updated `pyproject.toml` back to the repo.
-6. Creates a **GitHub Release** (tagged `baseline-YYYY-MM-DD`) with the JSON attached as a downloadable asset and detailed release notes including control count, framework version, and generation timestamp.
+To bump the schema version (e.g. when the catalog output structure changes), update `spec/VERSION` and add the new schema files to `spec/schemas/`.
 
 ## Development
 

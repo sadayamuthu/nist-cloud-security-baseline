@@ -453,8 +453,15 @@ def test_version_is_string():
 
 
 def test_generate_parser_returns_parser():
+    import argparse as _argparse
+
     p = _generate_parser()
-    assert p is not None
+    assert isinstance(p, _argparse.ArgumentParser)
+    # spot-check key arguments are registered
+    arg_dests = {a.dest for a in p._actions}
+    assert "out" in arg_dests
+    assert "non_negotiable_min_baseline" in arg_dests
+    assert "catalog_url" in arg_dests
 
 
 def test_generate_parser_add_help_false():

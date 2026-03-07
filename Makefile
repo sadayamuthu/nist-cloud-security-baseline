@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test test-cov lint format typecheck check clean build publish generate
+.PHONY: help install install-dev test test-cov lint format typecheck check generate
 
 # Default target
 help: ## Show this help
@@ -28,17 +28,6 @@ format: ## Auto-format code (ruff)
 	python3 -m ruff check --fix src/ tests/
 
 check: lint test-cov ## Run all checks (lint + test with 100% coverage)
-
-# ─── Build & Publish ───────────────────────────────────
-clean: ## Clean build artifacts
-	rm -rf dist/ build/ *.egg-info src/*.egg-info .pytest_cache .ruff_cache htmlcov
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-
-build: clean ## Build distribution packages
-	python3 -m build
-
-publish: build ## Publish to PyPI (requires PYPI_TOKEN)
-	python3 -m twine upload dist/*
 
 # ─── Application Usage ─────────────────────────────────
 generate: ## Run generation script for the baseline JSON

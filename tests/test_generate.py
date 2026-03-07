@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 from ncsb.generate import (
     Rules,
     _collect_prose,
+    _generate_parser,
     _related_controls,
     download_json,
     family_of,
@@ -442,3 +443,52 @@ def test_parse_oscal_profile_empty():
 
 def test_main_module_importable():
     import ncsb.__main__  # noqa: F401
+
+
+def test_version_is_string():
+    from ncsb import __version__
+
+    assert isinstance(__version__, str)
+    assert len(__version__) > 0
+
+
+def test_generate_parser_returns_parser():
+    import argparse as _argparse
+
+    p = _generate_parser()
+    assert isinstance(p, _argparse.ArgumentParser)
+    # spot-check key arguments are registered
+    arg_dests = {a.dest for a in p._actions}
+    assert "out" in arg_dests
+    assert "non_negotiable_min_baseline" in arg_dests
+    assert "catalog_url" in arg_dests
+
+
+def test_generate_parser_add_help_false():
+    p = _generate_parser(add_help=False)
+    # When add_help=False, --help should not be registered
+    actions = {a.option_strings[0] for a in p._actions if a.option_strings}
+    assert "--help" not in actions
+
+
+@patch("ncsb.generate.download_json", side_effect=_mock_download_json)
+def test_main_accepts_prebuilt_args(mock_dl, tmp_path):
+    """main() should accept a pre-parsed Namespace and not call parse_args."""
+    import argparse
+
+    out_path = str(tmp_path / "output.json")
+    args = argparse.Namespace(
+        out=out_path,
+        non_negotiable_min_baseline="moderate",
+        catalog_url="https://fake/catalog",
+        baseline_low_url="https://fake/low",
+        baseline_moderate_url="https://fake/moderate",
+        baseline_high_url="https://fake/high",
+        baseline_privacy_url="https://fake/privacy",
+        fedramp_lisaas_url="https://fake/fedramp/li-saas",
+        fedramp_low_url="https://fake/fedramp/low",
+        fedramp_moderate_url="https://fake/fedramp/moderate",
+        fedramp_high_url="https://fake/fedramp/high",
+    )
+    main(args)
+    assert Path(out_path).exists()

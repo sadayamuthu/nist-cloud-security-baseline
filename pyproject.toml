@@ -1,35 +1,15 @@
 [build-system]
-requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
+requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nist-cloud-security-baseline"
-version = "0.1.18"
+name = "ncsb"
+version = "0.2.0"
 description = "Generate a machine-readable, cloud-agnostic security baseline from NIST SP 800-53 Rev. 5 and SP 800-53B."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 authors = [{ name = "Karthikeyan Sadayamuthu" }]
-keywords = [
-    "nist",
-    "800-53",
-    "cloud-security",
-    "baseline",
-    "compliance",
-    "fedramp",
-]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Topic :: Security",
-]
 dependencies = [
     "requests>=2.31",
 ]
@@ -40,10 +20,12 @@ dev = [
     "pytest-cov>=6.0",
     "ruff>=0.4",
     "pre-commit>=4.0",
+    "jsonschema>=4.0",
+    "build>=1.0",
 ]
 
 [project.scripts]
-ncsb-generate = "ncsb.generate:main"
+ncsb = "ncsb.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -54,7 +36,7 @@ pythonpath = ["src", "."]
 addopts = "--cov=ncsb --cov-report=term-missing --cov-fail-under=100"
 
 [tool.coverage.run]
-source = ["ncsb", "scripts"]
+source = ["ncsb"]
 
 [tool.coverage.report]
 show_missing = true

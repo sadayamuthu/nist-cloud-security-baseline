@@ -1,16 +1,92 @@
+<div align="center">
+
 # NIST Cloud Security Baseline (NCSB)
 
-A Python tool that generates a **machine-readable, cloud-agnostic security baseline** from authoritative NIST publications. It merges the full NIST SP 800-53 Rev. 5 control catalog with the SP 800-53B baseline profiles and the FedRAMP OSCAL baselines, producing a single enriched JSON file ready for downstream automation.
+<h3>Machine-Readable NIST SP 800-53 Rev. 5 + FedRAMP Enriched Catalog</h3>
 
-## Why this exists
+<p>Daily-updated · Zero install · Cloud-agnostic</p>
 
-Cloud security teams need a common starting point that is vendor-neutral:
+[![CI](https://img.shields.io/github/actions/workflow/status/sadayamuthu/nist-cloud-security-baseline/main-release.yml?label=CI&style=flat-square)](https://github.com/sadayamuthu/nist-cloud-security-baseline/actions)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue?style=flat-square)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Catalog](https://img.shields.io/badge/catalog-latest.json-orange?style=flat-square)](https://openastra.org/ncsb/catalog/v0.1/latest.json)
+[![Schema](https://img.shields.io/badge/schema-v0.1-blueviolet?style=flat-square)](https://openastra.org/ncsb/schema/v0.1/ncsb.json)
 
-- **NIST SP 800-53 Rev. 5** defines *what* security controls exist (1,000+ controls and enhancements across 20 families like Access Control, Audit, System Protection, etc.).
-- **NIST SP 800-53B** defines *which* controls belong to the Low, Moderate, High, and Privacy baselines.
-- **FedRAMP Baselines** define the controls required for cloud service providers serving the US government (LI-SaaS, Low, Moderate, High).
+---
 
-These documents are published as separate JSON profiles by NIST and the GSA. NCSB downloads them, joins the data, and enriches every control with baseline membership flags, a derived severity level, and a non-negotiable indicator — all in one JSON file you can feed into policy engines, compliance dashboards, IaC scanners, or cloud-provider mapping tools.
+[What is NCSB?](#what-is-ncsb) · [How It Works](#how-it-works) · [Distribution](#distribution) · [Quick Start](#quick-start) · [Features](#features) · [Development](#development)
+
+</div>
+
+---
+
+## What is NCSB?
+
+**NCSB** publishes a daily, machine-readable, cloud-agnostic security baseline derived from authoritative NIST publications — fetch it directly, no install required:
+
+```
+https://openastra.org/ncsb/catalog/v0.1/latest.json
+```
+
+The catalog merges the full **NIST SP 800-53 Rev. 5** control catalog with **SP 800-53B** baseline profiles and **FedRAMP OSCAL** baselines, enriching every control with baseline membership flags, a derived severity level, and a non-negotiable indicator — all in one JSON file ready for policy engines, compliance dashboards, IaC scanners, or cloud-provider mapping tools.
+
+It is also a runnable Python generator for teams who want to self-host or customise the pipeline.
+
+---
+
+## How It Works
+
+```
+NIST OSCAL Profiles  ──┐
+SP 800-53 Catalog    ──┤
+SP 800-53B Baselines ──┼──▶  ncsb.generate  ──▶  Enriched Catalog JSON  ──▶  Downstream Systems
+FedRAMP Baselines    ──┘
+                           (severity · non_negotiable · baseline flags)
+```
+
+---
+
+## Distribution
+
+The catalog is published daily at a stable URL — no package to install.
+
+| Artifact | URL | Updated |
+|---|---|---|
+| Latest catalog | `https://openastra.org/ncsb/catalog/v0.1/latest.json` | daily |
+| Historical catalog | `https://openastra.org/ncsb/catalog/v0.1/historical/YYYY-MM-DD.json` | daily |
+| JSON Schema | `https://openastra.org/ncsb/schema/v0.1/ncsb.json` | on schema change |
+| YAML Schema | `https://openastra.org/ncsb/schema/v0.1/ncsb.yaml` | on schema change |
+
+Schema version (`v0.1`) is bumped only when the catalog output structure changes, creating a new versioned URL path.
+
+---
+
+## Quick Start
+
+Fetch the catalog directly:
+
+```bash
+curl -s https://openastra.org/ncsb/catalog/v0.1/latest.json | jq '.count'
+```
+
+Or install the CLI and fetch directly:
+
+```bash
+pip install ncsb
+ncsb fetch --out catalog.json
+```
+
+To run the generator locally (for self-hosting or development):
+
+```bash
+git clone https://github.com/sadayamuthu/nist-cloud-security-baseline.git
+cd nist-cloud-security-baseline
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+ncsb generate --out baseline/nist80053r5_full_catalog_enriched.json
+```
+
+---
 
 ## Features
 
@@ -21,83 +97,49 @@ These documents are published as separate JSON profiles by NIST and the GSA. NCS
 - **Configurable** — override any source URL or rule via CLI flags.
 - **CI-ready** — ships with a GitHub Actions workflow that regenerates the baseline daily and commits the result.
 
-## Quick start
+---
+
+## CLI Usage
 
 ```bash
-# clone and set up
-git clone https://github.com/<your-org>/nist-cloud-security-baseline.git
-cd nist-cloud-security-baseline
-python -m venv .venv
-source .venv/bin/activate
+# Download the pre-built catalog (fast, no OSCAL processing)
+ncsb fetch
+ncsb fetch --out my-catalog.json
 
-# install (editable, with dev tools)
-pip install -e ".[dev]"
+# Generate the catalog from scratch
+ncsb generate
+ncsb generate --out my-catalog.json --non_negotiable_min_baseline high
 
-# generate the enriched baseline
-ncsb-generate --out examples/nist80053r5_full_catalog_enriched.json
+# Print version
+ncsb --version
 ```
 
-Or run directly without installing as a package:
+### `ncsb fetch` options
 
-```bash
-pip install pandas requests
-python -m src.ncsb.generate --out examples/nist80053r5_full_catalog_enriched.json
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--out` | `nist80053r5_full_catalog_enriched.json` | Output file path |
 
-## CLI options
+### `ncsb generate` options
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--out` | `nist80053r5_full_catalog_enriched.json` | Output file path |
 | `--non_negotiable_min_baseline` | `moderate` | Minimum baseline for `non_negotiable=true` (`moderate` or `high`) |
-| `--controls_csv_url` | NIST catalog URL | Override the controls CSV source |
-| `--baseline_low_csv_url` | NIST Low baseline URL | Override the Low baseline CSV |
-| `--baseline_moderate_csv_url` | NIST Moderate baseline URL | Override the Moderate baseline CSV |
-| `--baseline_high_csv_url` | NIST High baseline URL | Override the High baseline CSV |
-| `--baseline_privacy_csv_url` | NIST Privacy baseline URL | Override the Privacy baseline CSV |
-| `--fedramp_lisaas_url` | FedRAMP LI-SaaS baseline URL | Override the FedRAMP LI-SaaS CSV |
-| `--fedramp_low_url` | FedRAMP Low baseline URL | Override the FedRAMP Low CSV |
-| `--fedramp_moderate_url` | FedRAMP Moderate baseline URL | Override the FedRAMP Moderate CSV |
-| `--fedramp_high_url` | FedRAMP High baseline URL | Override the FedRAMP High CSV |
+| `--catalog_url` | NIST catalog URL | Override the NIST SP 800-53 catalog source |
+| `--baseline_low_url` | NIST Low baseline URL | Override the Low baseline |
+| `--baseline_moderate_url` | NIST Moderate baseline URL | Override the Moderate baseline |
+| `--baseline_high_url` | NIST High baseline URL | Override the High baseline |
+| `--baseline_privacy_url` | NIST Privacy baseline URL | Override the Privacy baseline |
+| `--fedramp_lisaas_url` | FedRAMP LI-SaaS URL | Override the FedRAMP LI-SaaS baseline |
+| `--fedramp_low_url` | FedRAMP Low URL | Override the FedRAMP Low baseline |
+| `--fedramp_moderate_url` | FedRAMP Moderate URL | Override the FedRAMP Moderate baseline |
+| `--fedramp_high_url` | FedRAMP High URL | Override the FedRAMP High baseline |
 | `--version` | | Print version and exit |
 
-## Code Flow Design
+---
 
-```mermaid
-graph TD
-    A[NIST OSCAL JSON Catalogs] -->|HTTPS GET| B(ncsb.generate)
-    
-    subparse1(NIST SP 800-53 Rev. 5 Catalog) --> parse_catalog[Parse Catalog Data]
-    subparse2(Low Baseline) --> parse_profile[Parse Profile IDs]
-    subparse3(Moderate Baseline) --> parse_profile
-    subparse4(High Baseline) --> parse_profile
-    subparse5(Privacy Baseline) --> parse_profile
-    subparse6(FedRAMP Baselines) --> parse_profile
-
-    B -.-> subparse1
-    B -.-> subparse2
-    B -.-> subparse3
-    B -.-> subparse4
-    B -.-> subparse5
-    B -.-> subparse6
-
-    parse_catalog --> Enrich(Enrich Controls)
-    parse_profile --> Enrich
-
-    Enrich --> |assign baseline flags| C1(Baseline Membership)
-    Enrich --> |assign fedramp flags| C1b(FedRAMP Membership)
-    Enrich --> |derive severity| C2(Severity Level)
-    Enrich --> |evaluate conditions| C3(Non-negotiable Flag)
-
-    C1 --> Out(nist80053r5_full_catalog_enriched.json)
-    C1b --> Out
-    C2 --> Out
-    C3 --> Out
-    
-    Out --> D{Downstream Systems}
-```
-
-## Output schema
+## Output Schema
 
 The generated JSON has this top-level structure:
 
@@ -130,7 +172,9 @@ Each item in `controls[]`:
 | `severity` | string | `LOW` / `MEDIUM` / `HIGH` / `CRITICAL` |
 | `non_negotiable` | boolean | `true` |
 
-## Severity and non-negotiable rules
+---
+
+## Severity and Non-Negotiable Rules
 
 **Severity** is assigned based on the *earliest* (least restrictive) baseline a control appears in:
 
@@ -144,77 +188,140 @@ Each item in `controls[]`:
 
 **Non-negotiable** defaults to `true` when a control is in the Moderate or High baseline. Pass `--non_negotiable_min_baseline high` to restrict it to High-only.
 
-## Project structure
+---
+
+## Code Flow Design
+
+```mermaid
+graph TD
+    A[NIST OSCAL JSON Catalogs] -->|HTTPS GET| B(ncsb.generate)
+
+    subparse1(NIST SP 800-53 Rev. 5 Catalog) --> parse_catalog[Parse Catalog Data]
+    subparse2(Low Baseline) --> parse_profile[Parse Profile IDs]
+    subparse3(Moderate Baseline) --> parse_profile
+    subparse4(High Baseline) --> parse_profile
+    subparse5(Privacy Baseline) --> parse_profile
+    subparse6(FedRAMP Baselines) --> parse_profile
+
+    B -.-> subparse1
+    B -.-> subparse2
+    B -.-> subparse3
+    B -.-> subparse4
+    B -.-> subparse5
+    B -.-> subparse6
+
+    parse_catalog --> Enrich(Enrich Controls)
+    parse_profile --> Enrich
+
+    Enrich --> |assign baseline flags| C1(Baseline Membership)
+    Enrich --> |assign fedramp flags| C1b(FedRAMP Membership)
+    Enrich --> |derive severity| C2(Severity Level)
+    Enrich --> |evaluate conditions| C3(Non-negotiable Flag)
+
+    C1 --> Out(nist80053r5_full_catalog_enriched.json)
+    C1b --> Out
+    C2 --> Out
+    C3 --> Out
+
+    Out --> D{Downstream Systems}
+```
+
+---
+
+## Project Structure
 
 ```
 nist-cloud-security-baseline/
+├── spec/
+│   ├── VERSION              # schema version (semver → URL path)
+│   └── schemas/
+│       ├── ncsb-v0.1.json   # JSON Schema for catalog output
+│       └── ncsb-v0.1.yaml   # YAML equivalent
 ├── src/ncsb/
-│   ├── __init__.py          # package version
-│   ├── __main__.py          # python -m entry point
-│   ├── generate.py          # CLI and core logic
-│   └── urls.py              # default NIST download URLs
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── cli.py
+│   ├── fetch.py
+│   ├── generate.py
+│   └── urls.py
 ├── tests/
-│   ├── test_generate.py     # integration tests (mocked downloads)
-│   ├── test_bump_version.py # unit tests for version bumping
-│   └── test_oscal_id.py     # unit tests for ID normalization
-├── baseline/                # generated output (committed by CI)
-│   └── historical/          # timestamped copies
-├── scripts/
-│   └── bump_version.py      # automated package version management
+│   ├── test_cli.py
+│   ├── test_fetch.py
+│   ├── test_generate.py
+│   ├── test_oscal_id.py
+│   └── test_schema_validation.py
+├── baseline/
+│   └── historical/
 ├── .github/workflows/
-│   └── generate-baseline.yml
+│   ├── develop.yml
+│   ├── main-release.yml
+│   ├── pypi-publish.yml
+│   └── schema-release.yml
 ├── pyproject.toml
 ├── Makefile
 └── LICENSE
 ```
 
-## Automation (GitHub Actions)
+---
 
-The workflow at `.github/workflows/generate-baseline.yml` runs:
+## Automation
 
-- **On schedule** — daily at 06:00 UTC
-- **On push** to `main`
-- **On demand** via *Actions > Generate NIST Cloud Security Baseline > Run workflow*
+Two workflows handle publishing:
 
-Each run:
+**`main-release.yml`** — runs daily at 06:00 UTC (and on push to `main`, or manually):
+1. Runs the test suite across Python 3.11, 3.12, and 3.13
+2. Generates `baseline/nist80053r5_full_catalog_enriched.json` and commits it to this repo
+3. Pushes `latest.json` and a dated historical copy to `openastra.org/ncsb/catalog/v0.1/`
+4. Creates a GitHub Release (tag + changelog — the catalog URL is the artifact)
 
-1. Runs the test suite across Python 3.11, 3.12, and 3.13.
-2. Lints with [Ruff](https://docs.astral.sh/ruff/).
-3. Generates `baseline/nist80053r5_full_catalog_enriched.json` (latest, always the same path) and archives a timestamped copy under `baseline/historical/`.
-4. Automatically bumps the patch version in `pyproject.toml`.
-5. Commits and pushes the baseline files and the updated `pyproject.toml` back to the repo.
-6. Creates a **GitHub Release** (tagged `baseline-YYYY-MM-DD`) with the JSON attached as a downloadable asset and detailed release notes including control count, framework version, and generation timestamp.
+**`schema-release.yml`** — triggers only when `spec/**` changes:
+1. Reads `spec/VERSION` (semver), validates it, checks the tag doesn't already exist
+2. Pushes `ncsb.json` and `ncsb.yaml` to `openastra.org/ncsb/schema/v0.1/`
+3. Creates a GitHub Release tagged `spec-v{VERSION}` with schema files attached
+
+**`pypi-publish.yml`** — triggers when a `v*.*.*` tag is pushed:
+1. Builds the `ncsb` Python package
+2. Publishes to PyPI via OIDC Trusted Publishing (no API token required)
+
+To bump the schema version, update `spec/VERSION` and add the new schema files to `spec/schemas/`.
+
+---
 
 ## Development
 
-We use `make` to streamline everyday tasks.
-
 ```bash
-# install in editable mode with dev tools
-make install-dev
-
-# run tests
-make test
-
-# run tests and enforce 100% coverage
-make test-cov
-
-# auto-format code
-make format
-
-# lint code and run tests with coverage
-make check
+make install-dev   # Install with dev dependencies
+make test          # Run tests
+make test-cov      # Run tests with 100% coverage enforcement
+make format        # Auto-format code
+make check         # Lint + tests with coverage
 ```
 
-## Data sources
+---
 
-All data is fetched live from the official NIST downloads page and GSA GitHub repository:
+## Data Sources
 
-- [NIST SP 800-53 Rev. 5 Downloads](https://github.com/usnistgov/oscal-content)
+All data is fetched live from official sources:
+
+- [NIST SP 800-53 Rev. 5 OSCAL Content](https://github.com/usnistgov/oscal-content)
 - [GSA FedRAMP Automation](https://github.com/GSA/fedramp-automation)
 
 If NIST or GSA changes file names or paths, update `src/ncsb/urls.py` or pass the correct URLs via CLI flags.
 
+---
+
 ## License
 
-MIT (for this repository's code). NIST content is public domain (U.S. Government work).
+MIT — for this repository's code. NIST content is public domain (U.S. Government work).
+
+---
+
+<div align="center">
+
+**NCSB is an open-source NIST SP 800-53 Rev. 5 + FedRAMP enriched catalog**
+
+Managed by [OpenAstra](https://openastra.org).
+
+[Catalog](https://openastra.org/ncsb/catalog/v0.1/latest.json) · [GitHub](https://github.com/sadayamuthu/nist-cloud-security-baseline) · [Schema](https://openastra.org/ncsb/schema/v0.1/ncsb.json) · [OpenAstra](https://openastra.org)
+
+</div>

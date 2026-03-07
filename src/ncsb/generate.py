@@ -198,8 +198,12 @@ def non_negotiable_from_membership(m: dict[str, bool], rules: Rules) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def build_arg_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="ncsb-generate", description="Generate NIST Cloud Security Baseline JSON")
+def _generate_parser(add_help: bool = True) -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="ncsb-generate",
+        description="Generate NIST Cloud Security Baseline JSON",
+        add_help=add_help,
+    )
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     p.add_argument("--catalog_url", default=CATALOG_URL)
@@ -240,9 +244,10 @@ def log_orphan_baselines(
             )
 
 
-def main() -> None:
+def main(args: argparse.Namespace | None = None) -> None:
     logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARNING)
-    args = build_arg_parser().parse_args()
+    if args is None:
+        args = _generate_parser().parse_args()
     rules = Rules(non_negotiable_min_baseline=args.non_negotiable_min_baseline)
 
     catalog_data = download_json(args.catalog_url)

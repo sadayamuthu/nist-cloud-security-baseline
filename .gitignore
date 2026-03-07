@@ -32,3 +32,6 @@ htmlcov/
 
 # Local example output (regenerable)
 examples/*.json
+docs/plans
+docs/plans/*
+docs/plans/.*

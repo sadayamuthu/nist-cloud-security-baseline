@@ -3,8 +3,18 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
+<<<<<<< HEAD
 name = "ncsb"
 version = "0.2.0"
+=======
+<<<<<<< HEAD
+name = "nist-cloud-security-baseline"
+version = "0.1.18"
+=======
+name = "ncsb"
+version = "0.1.5"
+>>>>>>> 4a94468 (chore: rename package to ncsb, add CLI entry point and build dependency)
+>>>>>>> 3ea9441 (chore: rename package to ncsb, add CLI entry point and build dependency)
 description = "Generate a machine-readable, cloud-agnostic security baseline from NIST SP 800-53 Rev. 5 and SP 800-53B."
 readme = "README.md"
 license = { text = "MIT" }

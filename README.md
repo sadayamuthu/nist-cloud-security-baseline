@@ -1,22 +1,22 @@
-
+<div align="center">
 
 # NIST Cloud Security Baseline (NCSB)
 
-### Machine-Readable NIST SP 800-53 Rev. 5 + FedRAMP Enriched Catalog
+<h3>Machine-Readable NIST SP 800-53 Rev. 5 + FedRAMP Enriched Catalog</h3>
 
-Daily-updated · Zero install · Cloud-agnostic
+<p>Daily-updated · Zero install · Cloud-agnostic</p>
 
-[CI](https://github.com/sadayamuthu/nist-cloud-security-baseline/actions)
-[Python 3.11+](https://www.python.org/downloads/)
-[License: MIT](LICENSE)
-[Catalog](https://openastra.org/ncsb/catalog/v0.1/latest.json)
-[Schema](https://openastra.org/ncsb/schema/v0.1/ncsb.json)
+[![CI](https://img.shields.io/github/actions/workflow/status/sadayamuthu/nist-cloud-security-baseline/main-release.yml?label=CI&style=flat-square)](https://github.com/sadayamuthu/nist-cloud-security-baseline/actions)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue?style=flat-square)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Catalog](https://img.shields.io/badge/catalog-latest.json-orange?style=flat-square)](https://openastra.org/ncsb/catalog/v0.1/latest.json)
+[![Schema](https://img.shields.io/badge/schema-v0.1-blueviolet?style=flat-square)](https://openastra.org/ncsb/schema/v0.1/ncsb.json)
 
 ---
 
 [What is NCSB?](#what-is-ncsb) · [How It Works](#how-it-works) · [Distribution](#distribution) · [Quick Start](#quick-start) · [Features](#features) · [Development](#development)
 
-
+</div>
 
 ---
 
@@ -50,14 +50,12 @@ FedRAMP Baselines    ──┘
 
 The catalog is published daily at a stable URL — no package to install.
 
-
-| Artifact           | URL                                                                  | Updated          |
-| ------------------ | -------------------------------------------------------------------- | ---------------- |
-| Latest catalog     | `https://openastra.org/ncsb/catalog/v0.1/latest.json`                | daily            |
-| Historical catalog | `https://openastra.org/ncsb/catalog/v0.1/historical/YYYY-MM-DD.json` | daily            |
-| JSON Schema        | `https://openastra.org/ncsb/schema/v0.1/ncsb.json`                   | on schema change |
-| YAML Schema        | `https://openastra.org/ncsb/schema/v0.1/ncsb.yaml`                   | on schema change |
-
+| Artifact | URL | Updated |
+|---|---|---|
+| Latest catalog | `https://openastra.org/ncsb/catalog/v0.1/latest.json` | daily |
+| Historical catalog | `https://openastra.org/ncsb/catalog/v0.1/historical/YYYY-MM-DD.json` | daily |
+| JSON Schema | `https://openastra.org/ncsb/schema/v0.1/ncsb.json` | on schema change |
+| YAML Schema | `https://openastra.org/ncsb/schema/v0.1/ncsb.yaml` | on schema change |
 
 Schema version (`v0.1`) is bumped only when the catalog output structure changes, creating a new versioned URL path.
 
@@ -69,7 +67,11 @@ Fetch the catalog directly:
 
 ```bash
 curl -s https://openastra.org/ncsb/catalog/v0.1/latest.json | jq '.count'
-# Or install the CLI and fetch directly:
+```
+
+Or install the CLI and fetch directly:
+
+```bash
 pip install ncsb
 ncsb fetch --out catalog.json
 ```
@@ -156,21 +158,19 @@ The generated JSON has this top-level structure:
 
 Each item in `controls[]`:
 
-
-| Field                 | Type           | Example                                                              |
-| --------------------- | -------------- | -------------------------------------------------------------------- |
-| `control_id`          | string         | `AC-2` or `AC-2(1)`                                                  |
-| `control_name`        | string         | `Account Management`                                                 |
-| `family`              | string         | `AC`, `AU`, `SC`, ...                                                |
-| `control_text`        | string         | Full control statement                                               |
-| `discussion`          | string         | Supplemental guidance                                                |
-| `related_controls`    | string         | Comma-separated IDs                                                  |
-| `parent_control_id`   | string or null | `AC-2` (for enhancements)                                            |
-| `baseline_membership` | object         | `{ "low": true, "moderate": true, "high": true, "privacy": false }`  |
-| `fedramp_membership`  | object         | `{ "li_saas": false, "low": false, "moderate": true, "high": true }` |
-| `severity`            | string         | `LOW` / `MEDIUM` / `HIGH` / `CRITICAL`                               |
-| `non_negotiable`      | boolean        | `true`                                                               |
-
+| Field | Type | Example |
+|-------|------|---------|
+| `control_id` | string | `AC-2` or `AC-2(1)` |
+| `control_name` | string | `Account Management` |
+| `family` | string | `AC`, `AU`, `SC`, ... |
+| `control_text` | string | Full control statement |
+| `discussion` | string | Supplemental guidance |
+| `related_controls` | string | Comma-separated IDs |
+| `parent_control_id` | string or null | `AC-2` (for enhancements) |
+| `baseline_membership` | object | `{ "low": true, "moderate": true, "high": true, "privacy": false }` |
+| `fedramp_membership` | object | `{ "li_saas": false, "low": false, "moderate": true, "high": true }` |
+| `severity` | string | `LOW` / `MEDIUM` / `HIGH` / `CRITICAL` |
+| `non_negotiable` | boolean | `true` |
 
 ---
 
@@ -178,15 +178,13 @@ Each item in `controls[]`:
 
 **Severity** is assigned based on the *earliest* (least restrictive) baseline a control appears in:
 
-
-| Condition                     | Severity   |
-| ----------------------------- | ---------- |
-| In Low baseline               | `MEDIUM`   |
-| In Moderate (not Low)         | `HIGH`     |
+| Condition | Severity |
+|-----------|----------|
+| In Low baseline | `MEDIUM` |
+| In Moderate (not Low) | `HIGH` |
 | In High (not Low or Moderate) | `CRITICAL` |
-| Privacy-only                  | `MEDIUM`   |
-| Not in any baseline           | `LOW`      |
-
+| Privacy-only | `MEDIUM` |
+| Not in any baseline | `LOW` |
 
 **Non-negotiable** defaults to `true` when a control is in the Moderate or High baseline. Pass `--non_negotiable_min_baseline high` to restrict it to High-only.
 
@@ -228,8 +226,6 @@ graph TD
     Out --> D{Downstream Systems}
 ```
 
-
-
 ---
 
 ## Project Structure
@@ -244,9 +240,13 @@ nist-cloud-security-baseline/
 ├── src/ncsb/
 │   ├── __init__.py
 │   ├── __main__.py
+│   ├── cli.py
+│   ├── fetch.py
 │   ├── generate.py
 │   └── urls.py
 ├── tests/
+│   ├── test_cli.py
+│   ├── test_fetch.py
 │   ├── test_generate.py
 │   ├── test_oscal_id.py
 │   └── test_schema_validation.py
@@ -255,6 +255,7 @@ nist-cloud-security-baseline/
 ├── .github/workflows/
 │   ├── develop.yml
 │   ├── main-release.yml
+│   ├── pypi-publish.yml
 │   └── schema-release.yml
 ├── pyproject.toml
 ├── Makefile
@@ -267,18 +268,20 @@ nist-cloud-security-baseline/
 
 Two workflows handle publishing:
 
-`**main-release.yml**` — runs daily at 06:00 UTC (and on push to `main`, or manually):
-
+**`main-release.yml`** — runs daily at 06:00 UTC (and on push to `main`, or manually):
 1. Runs the test suite across Python 3.11, 3.12, and 3.13
 2. Generates `baseline/nist80053r5_full_catalog_enriched.json` and commits it to this repo
 3. Pushes `latest.json` and a dated historical copy to `openastra.org/ncsb/catalog/v0.1/`
 4. Creates a GitHub Release (tag + changelog — the catalog URL is the artifact)
 
-`**schema-release.yml**` — triggers only when `spec/**` changes:
-
+**`schema-release.yml`** — triggers only when `spec/**` changes:
 1. Reads `spec/VERSION` (semver), validates it, checks the tag doesn't already exist
 2. Pushes `ncsb.json` and `ncsb.yaml` to `openastra.org/ncsb/schema/v0.1/`
 3. Creates a GitHub Release tagged `spec-v{VERSION}` with schema files attached
+
+**`pypi-publish.yml`** — triggers when a `v*.*.*` tag is pushed:
+1. Builds the `ncsb` Python package
+2. Publishes to PyPI via OIDC Trusted Publishing (no API token required)
 
 To bump the schema version, update `spec/VERSION` and add the new schema files to `spec/schemas/`.
 
@@ -313,7 +316,7 @@ MIT — for this repository's code. NIST content is public domain (U.S. Governme
 
 ---
 
-
+<div align="center">
 
 **NCSB is an open-source NIST SP 800-53 Rev. 5 + FedRAMP enriched catalog**
 
@@ -321,3 +324,4 @@ Managed by [OpenAstra](https://openastra.org).
 
 [Catalog](https://openastra.org/ncsb/catalog/v0.1/latest.json) · [GitHub](https://github.com/sadayamuthu/nist-cloud-security-baseline) · [Schema](https://openastra.org/ncsb/schema/v0.1/ncsb.json) · [OpenAstra](https://openastra.org)
 
+</div>

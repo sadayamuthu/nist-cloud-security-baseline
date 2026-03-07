@@ -442,3 +442,10 @@ def test_parse_oscal_profile_empty():
 
 def test_main_module_importable():
     import ncsb.__main__  # noqa: F401
+
+
+def test_version_is_string():
+    from ncsb import __version__
+
+    assert isinstance(__version__, str)
+    assert len(__version__) > 0

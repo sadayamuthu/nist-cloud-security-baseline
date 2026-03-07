@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nist-cloud-security-baseline"
+name = "ncsb"
 version = "0.1.5"
 description = "Generate a machine-readable, cloud-agnostic security baseline from NIST SP 800-53 Rev. 5 and SP 800-53B."
 readme = "README.md"
@@ -21,7 +21,11 @@ dev = [
     "ruff>=0.4",
     "pre-commit>=4.0",
     "jsonschema>=4.0",
+    "build>=1.0",
 ]
+
+[project.scripts]
+ncsb = "ncsb.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -55,6 +55,21 @@ def test_fetch_prints_count_and_path(capsys):
     assert out_path in captured.out
 
 
+def test_fetch_prints_question_mark_when_count_missing(capsys):
+    fake_data = {"controls": []}  # no 'count' key
+    mock_resp = _fake_response(fake_data)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = str(Path(tmpdir) / "catalog.json")
+        args = _make_args(out_path)
+
+        with patch("ncsb.fetch.requests.get", return_value=mock_resp):
+            main(args)
+
+    captured = capsys.readouterr()
+    assert "?" in captured.out
+
+
 def test_fetch_prints_fetching_url(capsys):
     fake_data = {"count": 0, "controls": []}
     mock_resp = _fake_response(fake_data)

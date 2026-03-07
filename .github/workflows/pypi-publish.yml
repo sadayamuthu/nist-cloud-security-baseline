@@ -2,9 +2,8 @@ name: Publish to PyPI
 
 on:
   push:
-    branches: [main]
-    paths-ignore:
-      - "baseline/**"
+    tags:
+      - "v*.*.*"
 
 jobs:
   publish:

@@ -17,4 +17,4 @@ def main(args: argparse.Namespace) -> None:
     data = r.json()
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-    print(f"Wrote {data['count']} controls to {args.out}")
+    print(f"Wrote {data.get('count', '?')} controls to {args.out}")
